@@ -1,4 +1,6 @@
+// Type  = literal => string
 var esprima = require("esprima");
+var estraverse = require("estraverse");
 var options = {tokens:true, tolerant: true, loc: true, range: true };
 var fs = require("fs");
 
@@ -35,11 +37,15 @@ function FunctionBuilder()
 	// The number of parameters for functions
 	this.ParameterCount  = 0,
 	// Number of if statements/loops + 1
-	this.SimpleCyclomaticComplexity = 0;
+	this.SimpleCyclomaticComplexity = 1;
 	// The max depth of scopes (nested ifs, loops, etc)
-	this.MaxNestingDepth    = 0;
+	//this.MaxNestingDepth    = 0;
 	// The max number of conditions if one decision statement.
-	this.MaxConditions      = 0;
+	//this.MaxConditions      = 0;
+	// Retrun count in each functions
+	this.ReturnCount  = 0,
+	// Maximum message chain
+	this.MaxMessageChains = 0;
 
 	this.report = function()
 	{
@@ -48,13 +54,13 @@ function FunctionBuilder()
 		   	"{0}(): {1}\n" +
 		   	"============\n" +
 			   "SimpleCyclomaticComplexity: {2}\t" +
-				"MaxNestingDepth: {3}\t" +
-				"MaxConditions: {4}\t" +
-				"Parameters: {5}\n\n"
+				"Parameters: {3}\t" +
+				"ReturnCount: {4}\t"+
+				"MaxMessageChain: {5}\n\n"
 			)
 			.format(this.FunctionName, this.StartLine,
-				     this.SimpleCyclomaticComplexity, this.MaxNestingDepth,
-			        this.MaxConditions, this.ParameterCount)
+					 this.SimpleCyclomaticComplexity, this.ParameterCount, 
+					 this.ReturnCount, this.MaxMessageChains)
 		);
 	}
 };
@@ -68,14 +74,18 @@ function FileBuilder()
 	// Number of imports in a file.
 	this.ImportCount = 0;
 
+	// All conditions in a file.
+	this.AllConditions = 0;
+
 	this.report = function()
 	{
 		console.log (
 			( "{0}\n" +
 			  "~~~~~~~~~~~~\n"+
 			  "ImportCount {1}\t" +
-			  "Strings {2}\n"
-			).format( this.FileName, this.ImportCount, this.Strings ));
+			  "Strings {2}\n"+
+			  "AllConditions {3}\n"
+			).format( this.FileName, this.ImportCount, this.Strings, this.AllConditions));
 	}
 }
 
@@ -103,7 +113,6 @@ function complexity(filePath)
 {
 	var buf = fs.readFileSync(filePath, "utf8");
 	var ast = esprima.parse(buf, options);
-
 	var i = 0;
 
 	// A file level-builder:
@@ -115,12 +124,70 @@ function complexity(filePath)
 	// Tranverse program with a function visitor.
 	traverseWithParents(ast, function (node) 
 	{
+		// Part-1 Package Complexity per file
+		if(node.type === 'CallExpression'){
+			if(node.callee.name === 'require')
+				fileBuilder.ImportCount++;
+		}
+
+		// Part-1 String Literals per file
+		if(node.type === "Literal"){
+			if(typeof node.value === 'string'){
+				fileBuilder.Strings++;
+			}	
+		}
+
+		// Part-1 Import Count per file
+		if(node.type === 'CallExpression'){
+			if(node.callee.name === 'require')
+				fileBuilder.ImportCount++;
+		}
+
+		// Part-1 AllConditions = if/while + logical expressions per file
+		if(isDecision(node)){
+            fileBuilder.AllConditions++;
+		}
+		
+		// Logical expression conditions
+		if(node.type==="LogicalExpression"){
+            fileBuilder.AllConditions++;
+		}
+
+		// Per function calculations
 		if (node.type === 'FunctionDeclaration') 
 		{
 			var builder = new FunctionBuilder();
 
 			builder.FunctionName = functionName(node);
 			builder.StartLine    = node.loc.start.line;
+			// Part-2 Max Message Chains
+			builder.MaxMessageChains = maxMessageChains(node.body);
+
+			// Part-1 Parameters Count per function
+			builder.ParameterCount = node.params.length;
+
+			traverseWithParents(node, function (child){
+
+				// Part-2 SimpleCyclomatic Count
+				if(isDecision(child))
+					builder.SimpleCyclomaticComplexity++;
+
+				// if(child.type === "IfStatement"){
+
+				// 	traverseWithParents(child.test, function (cond){
+				// 		if(cond.type === "LogicalExpression"){
+				// 			builder.MaxConditions++;
+				// 		}
+				// 	});
+				// }
+
+				// Part-1 Return statement Count per function
+				if(child.type === "ReturnStatement"){
+					builder.ReturnCount++;
+				}
+			});
+
+			// Max conditions
 
 			builders[builder.FunctionName] = builder;
 		}
@@ -275,4 +342,27 @@ remainder.toString() + " seconds";
 mints.toString().split(".")[0] + " " + szmin;
       }
   }
+
+//Calculating maxMessageChains
+function maxMessageChains(body){
+    var length = 0;
+    estraverse.traverse(body, {
+		enter: function(node){
+			if (node.type == 'MemberExpression'){
+				var chain = 1;
+				estraverse.traverse(node, {
+					enter: function(child){
+						if (child.property){
+								chain++;                                    
+						}
+					}
+				});            
+				if(chain > length){
+					length = chain;
+				}                                  
+			}              
+		}            
+	});
+    return length;
+}
  exports.complexity = complexity;
