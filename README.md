@@ -1,8 +1,8 @@
-# HW4
+# HW4       
 
-Complete and extend the workshop to solve the following measures:    
-**Submittion:**   
-[Link](./analysis.js) to code file  
+[Link](./analysis.js) to code file        
+      
+Complete and extend the workshop to solve the following measures:       
       
 1. Do a simple calculations (50 points)
 
