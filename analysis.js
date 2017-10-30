@@ -41,7 +41,7 @@ function FunctionBuilder()
 	// The max depth of scopes (nested ifs, loops, etc)
 	//this.MaxNestingDepth    = 0;
 	// The max number of conditions if one decision statement.
-	//this.MaxConditions      = 0;
+	this.MaxConditions = 0;
 	// Retrun count in each functions
 	this.ReturnCount  = 0,
 	// Maximum message chain
@@ -56,11 +56,12 @@ function FunctionBuilder()
 			   "SimpleCyclomaticComplexity: {2}\t" +
 				"Parameters: {3}\t" +
 				"ReturnCount: {4}\t"+
-				"MaxMessageChain: {5}\n\n"
+				"MaxMessageChain: {5}\t"+
+				"MaxConditions: {6}\n\n"
 			)
 			.format(this.FunctionName, this.StartLine,
 					 this.SimpleCyclomaticComplexity, this.ParameterCount, 
-					 this.ReturnCount, this.MaxMessageChains)
+					 this.ReturnCount, this.MaxMessageChains, this.MaxConditions)
 		);
 	}
 };
@@ -137,12 +138,6 @@ function complexity(filePath)
 			}	
 		}
 
-		// Part-1 Import Count per file
-		if(node.type === 'CallExpression'){
-			if(node.callee.name === 'require')
-				fileBuilder.ImportCount++;
-		}
-
 		// Part-1 AllConditions = if/while + logical expressions per file
 		if(isDecision(node)){
             fileBuilder.AllConditions++;
@@ -172,14 +167,15 @@ function complexity(filePath)
 				if(isDecision(child))
 					builder.SimpleCyclomaticComplexity++;
 
-				// if(child.type === "IfStatement"){
-
-				// 	traverseWithParents(child.test, function (cond){
-				// 		if(cond.type === "LogicalExpression"){
-				// 			builder.MaxConditions++;
-				// 		}
-				// 	});
-				// }
+				if(child.type === "IfStatement"){
+					builder.MaxConditions++;
+					
+					traverseWithParents(child.test, function (cond){
+						if(cond.type === "LogicalExpression"){
+							builder.MaxConditions++;
+						}
+					});
+				}
 
 				// Part-1 Return statement Count per function
 				if(child.type === "ReturnStatement"){
