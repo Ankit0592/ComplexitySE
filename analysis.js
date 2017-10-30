@@ -361,4 +361,4 @@ function maxMessageChains(body){
 	});
     return length;
 }
- exports.complexity = complexity;
+exports.complexity = complexity;
