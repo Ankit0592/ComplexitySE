@@ -83,8 +83,8 @@ function FileBuilder()
 		console.log (
 			( "{0}\n" +
 			  "~~~~~~~~~~~~\n"+
-			  "ImportCount {1}\t" +
-			  "Strings {2}\n"+
+			  "PackageComplexity {1}\t" +
+			  "Strings {2}\t"+
 			  "AllConditions {3}\n"
 			).format( this.FileName, this.ImportCount, this.Strings, this.AllConditions));
 	}
