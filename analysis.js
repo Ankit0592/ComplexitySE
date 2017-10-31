@@ -140,6 +140,10 @@ function complexity(filePath)
 		}
 		
 		// Part-1 AllConditions
+		if(isDecision(node)){
+			fileBuilder.AllConditions++;
+		}
+		
 		if(node.type==="LogicalExpression"){
             fileBuilder.AllConditions++;
 		}
