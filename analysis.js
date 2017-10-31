@@ -39,7 +39,7 @@ function FunctionBuilder()
 	// Number of if statements/loops + 1
 	this.SimpleCyclomaticComplexity = 1;
 	// The max depth of scopes (nested ifs, loops, etc)
-	//this.MaxNestingDepth    = 0;
+	this.MaxNestingDepth    = 0;
 	// The max number of conditions if one decision statement.
 	this.MaxConditions = 0;
 	// Retrun count in each functions
@@ -57,11 +57,12 @@ function FunctionBuilder()
 				"Parameters: {3}\t" +
 				"ReturnCount: {4}\t"+
 				"MaxMessageChain: {5}\t"+
-				"MaxConditions: {6}\n\n"
+				"MaxConditions: {6}\t"+
+		   		"MaxNestingDepth: {7}\n\n"
 			)
 			.format(this.FunctionName, this.StartLine,
 					 this.SimpleCyclomaticComplexity, this.ParameterCount, 
-					 this.ReturnCount, this.MaxMessageChains, this.MaxConditions)
+					 this.ReturnCount, this.MaxMessageChains, this.MaxConditions, this.MaxNestingDepth)
 		);
 	}
 };
@@ -137,13 +138,8 @@ function complexity(filePath)
 				fileBuilder.Strings++;
 			}	
 		}
-
-		// Part-1 AllConditions = if/while + logical expressions per file
-		if(isDecision(node)){
-            fileBuilder.AllConditions++;
-		}
 		
-		// Logical expression conditions
+		// Part-1 AllConditions
 		if(node.type==="LogicalExpression"){
             fileBuilder.AllConditions++;
 		}
@@ -163,18 +159,31 @@ function complexity(filePath)
 
 			traverseWithParents(node, function (child){
 
+				if (isDecision(child)) {
+					var nest = 0;
+					traverseWithParents(child, function(nextchild){	
+						if (isDecision(nextchild)) {
+							nest++;
+						} 
+					});
+					if (nest > builder.MaxNestingDepth) {
+						builder.MaxNestingDepth = nest;
+					}
+				}
+				nest = 0;
+
 				// Part-2 SimpleCyclomatic Count
-				if(isDecision(child))
+				if(isDecision(child)){
 					builder.SimpleCyclomaticComplexity++;
 
-				if(child.type === "IfStatement"){
-					builder.MaxConditions++;
-					
-					traverseWithParents(child.test, function (cond){
-						if(cond.type === "LogicalExpression"){
-							builder.MaxConditions++;
-						}
-					});
+					if(child.type!='ForInStatement'){
+						
+						traverseWithParents(child.test, function (cond){
+							if(cond.type === "LogicalExpression"){
+								builder.MaxConditions++;
+							}
+						});
+					}
 				}
 
 				// Part-1 Return statement Count per function
@@ -345,7 +354,7 @@ function maxMessageChains(body){
     estraverse.traverse(body, {
 		enter: function(node){
 			if (node.type == 'MemberExpression'){
-				var chain = 1;
+				var chain = 0;
 				estraverse.traverse(node, {
 					enter: function(child){
 						if (child.property){
